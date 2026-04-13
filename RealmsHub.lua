@@ -1,241 +1,274 @@
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local LocalizationService = game:GetService("LocalizationService")
-
-local player = Players.LocalPlayer
-
-local function getHum()
-	return player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-end
-
-local function getRoot()
-	return player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-end
-
-local function detectLang()
-	local ok,res = pcall(function()
-		return LocalizationService.RobloxLocaleId
-	end)
-	if ok and res then
-		res = res:lower()
-		if res:find("es") then return "es"
-		elseif res:find("he") then return "he"
-		elseif res:find("fr") then return "fr"
-	end end
-	return "en"
-end
-
-local lang = detectLang()
-
-local L = {
-	en={hub="Realmshub",movement="Movement",player="Player",world="World",misc="Misc",on="ON",off="OFF"},
-	es={hub="Realmshub",movement="Movimiento",player="Jugador",world="Mundo",misc="Extra",on="ON",off="OFF"},
-	he={hub="Realmshub",movement="תנועה",player="שחקן",world="עולם",misc="נוסף",on="פועל",off="כבוי"},
-	fr={hub="Realmshub",movement="Mouvement",player="Joueur",world="Monde",misc="Divers",on="ON",off="OFF"}
+--// SERVICES
+local S = {
+	P = game:GetService("Players"),
+	UIS = game:GetService("UserInputService"),
+	RS = game:GetService("RunService"),
+	HS = game:GetService("HttpService"),
+	TS = game:GetService("TweenService")
 }
 
-local gui=Instance.new("ScreenGui",game.CoreGui)
+local LP = S.P.LocalPlayer
 
-local main=Instance.new("Frame",gui)
-main.Size=UDim2.new(0,380,0,280)
-main.Position=UDim2.new(0.3,0,0.3,0)
-main.BackgroundColor3=Color3.fromRGB(18,18,18)
-Instance.new("UICorner",main)
+--// CHAR
+local function C() return LP.Character end
+local function H() return C() and C():FindFirstChildOfClass("Humanoid") end
+local function R() return C() and C():FindFirstChild("HumanoidRootPart") end
 
-local title=Instance.new("TextLabel",main)
-title.Size=UDim2.new(1,0,0,30)
-title.BackgroundTransparency=1
-title.TextColor3=Color3.new(1,1,1)
-title.Font=Enum.Font.GothamBold
-
-local tabBar=Instance.new("Frame",main)
-tabBar.Size=UDim2.new(1,0,0,30)
-tabBar.Position=UDim2.new(0,0,0,30)
-tabBar.BackgroundTransparency=1
-
-local pages=Instance.new("Frame",main)
-pages.Size=UDim2.new(1,0,1,-60)
-pages.Position=UDim2.new(0,0,0,60)
-pages.BackgroundTransparency=1
-
-local function newPage()
-	local f=Instance.new("Frame",pages)
-	f.Size=UDim2.new(1,0,1,0)
-	f.BackgroundTransparency=1
-	f.Visible=false
-	return f
+--// SAVE
+local FILE="realmshub_full.json"
+local CFG={}
+pcall(function()
+	if readfile and isfile and isfile(FILE) then
+		CFG=S.HS:JSONDecode(readfile(FILE))
+	end
+end)
+local function save()
+	if writefile then writefile(FILE,S.HS:JSONEncode(CFG)) end
 end
 
-local movementPage=newPage()
-local playerPage=newPage()
-local worldPage=newPage()
-local miscPage=newPage()
-movementPage.Visible=true
+--// STATE
+local T={target=nil,flags={},vals={speed=16,fly=60,gravity=workspace.Gravity}}
 
-local function switchPage(p)
-	for _,v in pairs(pages:GetChildren()) do v.Visible=false end
-	p.Visible=true
-	p.BackgroundTransparency=1
-	TweenService:Create(p,TweenInfo.new(0.2),{BackgroundTransparency=0}):Play()
-end
+--// GUI
+local G=Instance.new("ScreenGui",game.CoreGui)
+local M=Instance.new("Frame",G)
+M.Size=UDim2.new(0,520,0,380)
+M.Position=UDim2.new(0.3,0,0.2,0)
+M.BackgroundColor3=Color3.fromRGB(18,18,18)
 
-local function tab(x,name,page)
-	local b=Instance.new("TextButton",tabBar)
-	b.Size=UDim2.new(0.25,0,1,0)
-	b.Position=UDim2.new(x,0,0,0)
-	b.BackgroundColor3=Color3.fromRGB(25,25,25)
-	b.TextColor3=Color3.new(1,1,1)
-	Instance.new("UICorner",b)
-	b.MouseButton1Click:Connect(function() switchPage(page) end)
-	return b,name
-end
-
-local tabs={}
-table.insert(tabs,{tab(0,"movement",movementPage)})
-table.insert(tabs,{tab(0.25,"player",playerPage)})
-table.insert(tabs,{tab(0.5,"world",worldPage)})
-table.insert(tabs,{tab(0.75,"misc",miscPage)})
-
-local toggles={}
-
-local function toggle(parent,y,label,callback)
-	local b=Instance.new("TextButton",parent)
-	b.Size=UDim2.new(1,-20,0,35)
-	b.Position=UDim2.new(0,10,0,y)
-	b.BackgroundColor3=Color3.fromRGB(28,28,28)
-	b.TextColor3=Color3.new(1,1,1)
-	Instance.new("UICorner",b)
-
-	local state=false
-	local t={
-		btn=b,label=label,
-		set=function()
-			local txt=L[lang]
-			b.Text=label..": "..(state and txt.on or txt.off)
+-- DRAG
+do
+	local d,ds,sp
+	M.InputBegan:Connect(function(i)
+		if i.UserInputType==1 then d=true ds=i.Position sp=M.Position end
+	end)
+	S.UIS.InputChanged:Connect(function(i)
+		if d and i.UserInputType==0 then
+			local delta=i.Position-ds
+			M.Position=sp+UDim2.new(0,delta.X,0,delta.Y)
 		end
-	}
+	end)
+	S.UIS.InputEnded:Connect(function(i) if i.UserInputType==1 then d=false end end)
+end
+
+-- TABS
+local tabs={"Combat","Movement","Player","World","Misc"}
+local pages={}
+local current
+
+local tabBar=Instance.new("Frame",M)
+tabBar.Size=UDim2.new(1,0,0,30)
+
+for i,name in pairs(tabs) do
+	local b=Instance.new("TextButton",tabBar)
+	b.Size=UDim2.new(1/#tabs,0,1,0)
+	b.Position=UDim2.new((i-1)/#tabs,0,0,0)
+	b.Text=name
+
+	local p=Instance.new("ScrollingFrame",M)
+	p.Size=UDim2.new(1,0,1,-30)
+	p.Position=UDim2.new(0,0,0,30)
+	p.Visible=false
+	p.CanvasSize=UDim2.new(0,0,5,0)
+	pages[name]=p
 
 	b.MouseButton1Click:Connect(function()
-		state=not state
-		callback(state)
-		TweenService:Create(b,TweenInfo.new(0.1),{BackgroundColor3=Color3.fromRGB(40,40,40)}):Play()
-		task.delay(0.1,function()
-			TweenService:Create(b,TweenInfo.new(0.1),{BackgroundColor3=Color3.fromRGB(28,28,28)}):Play()
-		end)
-		t.set()
+		for _,v in pairs(pages) do v.Visible=false end
+		p.Visible=true
 	end)
 
-	table.insert(toggles,t)
-	t.set()
-	return t,function() return state end
+	if not current then current=p p.Visible=true end
 end
 
-local function slider(parent,y,min,max,val,callback)
-	local bar=Instance.new("Frame",parent)
-	bar.Size=UDim2.new(1,-20,0,6)
-	bar.Position=UDim2.new(0,10,0,y)
-	bar.BackgroundColor3=Color3.fromRGB(50,50,50)
+-- UI BUILDER
+local function make(page)
+	local y=10
+	return function(name,typ,cb,min,max)
+		local o=Instance.new("TextButton",page)
+		o.Size=UDim2.new(1,-20,0,30)
+		o.Position=UDim2.new(0,10,0,y)
 
-	local fill=Instance.new("Frame",bar)
-	fill.Size=UDim2.new(0.5,0,1,0)
-	fill.BackgroundColor3=Color3.fromRGB(0,170,255)
-	Instance.new("UICorner",bar)
-	Instance.new("UICorner",fill)
+		if typ=="toggle" then
+			local v=CFG[name] or false
+			local function upd() o.Text=name..": "..(v and "ON" or "OFF") end
+			o.MouseButton1Click:Connect(function()
+				v=not v CFG[name]=v save() cb(v)
+				S.TS:Create(o,TweenInfo.new(0.2),{BackgroundColor3=v and Color3.fromRGB(0,170,255) or Color3.fromRGB(30,30,30)}):Play()
+				upd()
+			end)
+			upd()
+			return function() return v end
 
-	local function set(x)
-		local p=math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
-		fill.Size=UDim2.new(p,0,1,0)
-		callback(min+(max-min)*p)
-	end
+		elseif typ=="slider" then
+			o.Text=name
+			local fill=Instance.new("Frame",o)
+			fill.BackgroundColor3=Color3.fromRGB(0,170,255)
 
-	bar.InputBegan:Connect(function(i)
-		if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-			set(i.Position.X)
+			o.InputBegan:Connect(function(i)
+				if i.UserInputType==1 then
+					local p=(i.Position.X-o.AbsolutePosition.X)/o.AbsoluteSize.X
+					local val=min+(max-min)*math.clamp(p,0,1)
+					fill.Size=UDim2.new(p,0,1,0)
+					CFG[name]=val save() cb(val)
+				end
+			end)
+
+		elseif typ=="button" then
+			o.Text=name
+			o.MouseButton1Click:Connect(cb)
 		end
-	end)
+
+		y+=35
+	end
 end
 
-local originalSpeed=16
-local speedVal=16
-local speedEnabled=false
+local UI={}
+for k,v in pairs(pages) do UI[k]=make(v) end
 
-toggle(movementPage,10,"Speed",function(v)
-	speedEnabled=v
-	if not v then
-		local h=getHum()
-		if h then h.WalkSpeed=originalSpeed end
+-- PLAYER LIST + TARGET
+local function nearest()
+	local root=R()
+	local dist=math.huge
+	local best=nil
+	for _,p in pairs(S.P:GetPlayers()) do
+		if p~=LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			local d=(p.Character.HumanoidRootPart.Position-root.Position).Magnitude
+			if d<dist then dist=d best=p end
+		end
+	end
+	return best
+end
+
+-- FEATURES
+
+-- MOVEMENT
+local speed=UI.Movement("Speed","toggle",function()end)
+UI.Movement("SpeedPower","slider",function(v)T.vals.speed=v end,16,200)
+
+local fly=UI.Movement("Fly","toggle",function(v)
+	local r=R()
+	if r then
+		if v then
+			T.bv=Instance.new("BodyVelocity",r)
+			T.bv.MaxForce=Vector3.new(1e9,1e9,1e9)
+		else if T.bv then T.bv:Destroy() end end
+	end
+end)
+UI.Movement("FlySpeed","slider",function(v)T.vals.fly=v end,10,200)
+
+UI.Movement("Noclip","toggle",function(v)T.flags.noclip=v end)
+UI.Movement("InfJump","toggle",function(v)T.flags.infjump=v end)
+UI.Movement("Bhop","toggle",function(v)T.flags.bhop=v end)
+UI.Movement("HighJump","toggle",function(v)T.flags.high=v end)
+
+-- COMBAT
+UI.Combat("Aimbot","toggle",function(v)T.flags.aim=v end)
+UI.Combat("SilentAim","toggle",function(v)T.flags.silent=v end)
+UI.Combat("Aura","toggle",function(v)T.flags.aura=v end)
+UI.Combat("Fling","toggle",function(v)T.flags.fling=v end)
+
+UI.Combat("AutoTarget","toggle",function(v)T.flags.auto=v end)
+
+-- PLAYER
+UI.Player("Spinbot","toggle",function(v)T.flags.spin=v end)
+
+-- WORLD
+UI.World("Gravity","slider",function(v)workspace.Gravity=v end,0,196)
+UI.World("FOV","slider",function(v)workspace.CurrentCamera.FieldOfView=v end,60,120)
+
+-- MISC
+UI.Misc("Fullbright","toggle",function(v)
+	if v then
+		game.Lighting.Brightness=3
+		game.Lighting.ClockTime=14
 	end
 end)
 
-slider(movementPage,50,16,200,16,function(v)
-	speedVal=v
+UI.Misc("Script Loader","button",function()
+	local url=game:GetService("StarterGui"):PromptTextInput("Enter Script URL")
+	if url then loadstring(game:HttpGet(url))() end
 end)
 
-local fly=false
-local flySpeed=60
-
-toggle(movementPage,90,"Fly",function(v) fly=v end)
-slider(movementPage,130,10,200,60,function(v) flySpeed=v end)
-
-local noclip=false
-toggle(movementPage,170,"Noclip",function(v) noclip=v end)
-
-local infJump=false
-toggle(playerPage,10,"InfJump",function(v) infJump=v end)
-
-local gravity=workspace.Gravity
-slider(worldPage,10,0,196,gravity,function(v) workspace.Gravity=v end)
-
-local fov=70
-slider(worldPage,50,60,120,fov,function(v) workspace.CurrentCamera.FieldOfView=v end)
-
-local wf=false
-local wfPower=12000
-toggle(miscPage,10,"WalkFling",function(v) wf=v end)
-slider(miscPage,50,2000,50000,wfPower,function(v) wfPower=v end)
-
+-- KEYBINDS
+local binds={}
 UIS.InputBegan:Connect(function(i,g)
 	if g then return end
-	if infJump and i.KeyCode==Enum.KeyCode.Space then
-		local h=getHum()
-		if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+	for k,v in pairs(binds) do
+		if i.KeyCode==v then
+			T.flags[k]=not T.flags[k]
+		end
 	end
 end)
 
-RunService.Heartbeat:Connect(function()
-	local h=getHum()
-	local root=getRoot()
-	if not h or not root then return end
+-- SILENT AIM (HOOK)
+local mt=getrawmetatable(game)
+setreadonly(mt,false)
+local old=mt.__namecall
 
-	if not originalSpeed or originalSpeed==0 then
-		originalSpeed=h.WalkSpeed
+mt.__namecall=function(self,...)
+	local args={...}
+	if tostring(getnamecallmethod())=="Raycast" and T.flags.silent and T.target and T.target.Character then
+		local part=T.target.Character:FindFirstChild("Head")
+		if part then
+			args[2]=(part.Position - args[1]).Unit*1000
+			return old(self,unpack(args))
+		end
+	end
+	return old(self,...)
+end
+
+-- LOOP
+S.RS.Heartbeat:Connect(function()
+	local h,r=H(),R()
+	if not h or not r then return end
+
+	if T.flags.auto then T.target=nearest() end
+
+	if speed() then h.WalkSpeed=T.vals.speed end
+
+	if fly() and T.bv then
+		T.bv.Velocity=workspace.CurrentCamera.CFrame.LookVector*T.vals.fly
 	end
 
-	if speedEnabled then
-		h.WalkSpeed=speedVal
-	end
-
-	if fly then
-		root.Velocity=workspace.CurrentCamera.CFrame.LookVector*flySpeed
-	end
-
-	if noclip then
-		for _,v in pairs(player.Character:GetDescendants()) do
+	if T.flags.noclip then
+		for _,v in pairs(C():GetDescendants()) do
 			if v:IsA("BasePart") then v.CanCollide=false end
 		end
 	end
 
-	if wf then
-		local vel=root.Velocity
-		root.Velocity=vel*(wfPower/1000)+Vector3.new(0,wfPower/2000,0)
+	if T.flags.infjump then
+		h:ChangeState(Enum.HumanoidStateType.Jumping)
+	end
+
+	if T.flags.bhop and h.FloorMaterial~=Enum.Material.Air then
+		h:ChangeState(Enum.HumanoidStateType.Jumping)
+	end
+
+	if T.flags.high then
+		r.Velocity=Vector3.new(r.Velocity.X,80,r.Velocity.Z)
+	end
+
+	if T.flags.spin then
+		r.RotVelocity=Vector3.new(0,50,0)
+	end
+
+	if T.flags.fling then
+		r.RotVelocity=Vector3.new(0,9999,0)
+	end
+
+	if T.flags.aim and T.target and T.target.Character then
+		workspace.CurrentCamera.CFrame=
+			CFrame.new(workspace.CurrentCamera.CFrame.Position,
+			T.target.Character.HumanoidRootPart.Position)
+	end
+
+	if T.flags.aura then
+		for _,p in pairs(S.P:GetPlayers()) do
+			if p~=LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+				if (p.Character.HumanoidRootPart.Position-r.Position).Magnitude<10 then
+					p.Character.Humanoid:TakeDamage(5)
+				end
+			end
+		end
 	end
 end)
-
-local function updateText()
-	title.Text=L[lang].hub
-	for _,t in pairs(toggles) do t.set() end
-end
-
-updateText()
