@@ -23,7 +23,6 @@ local function detectLang()
 		if res:find("es") then return "es"
 		elseif res:find("he") then return "he"
 		elseif res:find("fr") then return "fr"
-		elseif res:find("de") then return "de"
 	end end
 	return "en"
 end
@@ -31,193 +30,212 @@ end
 local lang = detectLang()
 
 local L = {
-	en = {hub="Realmshub",movement="Movement",player="Player",misc="Misc",on="ON",off="OFF",speed="Speed",fly="Fly",noclip="Noclip",lang="Language"},
-	es = {hub="Realmshub",movement="Movimiento",player="Jugador",misc="Extra",on="ON",off="OFF",speed="Velocidad",fly="Volar",noclip="Noclip",lang="Idioma"},
-	he = {hub="Realmshub",movement="תנועה",player="שחקן",misc="נוסף",on="פועל",off="כבוי",speed="מהירות",fly="תעופה",noclip="נוקליפ",lang="שפה"},
-	fr = {hub="Realmshub",movement="Mouvement",player="Joueur",misc="Divers",on="ON",off="OFF",speed="Vitesse",fly="Voler",noclip="Noclip",lang="Langue"},
-	de = {hub="Realmshub",movement="Bewegung",player="Spieler",misc="Extra",on="AN",off="AUS",speed="Geschwindigkeit",fly="Fliegen",noclip="Noclip",lang="Sprache"}
+	en={hub="Realmshub",movement="Movement",player="Player",world="World",misc="Misc",on="ON",off="OFF"},
+	es={hub="Realmshub",movement="Movimiento",player="Jugador",world="Mundo",misc="Extra",on="ON",off="OFF"},
+	he={hub="Realmshub",movement="תנועה",player="שחקן",world="עולם",misc="נוסף",on="פועל",off="כבוי"},
+	fr={hub="Realmshub",movement="Mouvement",player="Joueur",world="Monde",misc="Divers",on="ON",off="OFF"}
 }
 
-local gui = Instance.new("ScreenGui", game.CoreGui)
+local gui=Instance.new("ScreenGui",game.CoreGui)
 
-local main = Instance.new("Frame", gui)
-main.Size = UDim2.new(0,360,0,260)
-main.Position = UDim2.new(0.3,0,0.3,0)
-main.BackgroundColor3 = Color3.fromRGB(18,18,18)
-Instance.new("UICorner", main)
+local main=Instance.new("Frame",gui)
+main.Size=UDim2.new(0,380,0,280)
+main.Position=UDim2.new(0.3,0,0.3,0)
+main.BackgroundColor3=Color3.fromRGB(18,18,18)
+Instance.new("UICorner",main)
 
-local title = Instance.new("TextLabel", main)
-title.Size = UDim2.new(1,0,0,30)
-title.BackgroundTransparency = 1
-title.TextColor3 = Color3.new(1,1,1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
+local title=Instance.new("TextLabel",main)
+title.Size=UDim2.new(1,0,0,30)
+title.BackgroundTransparency=1
+title.TextColor3=Color3.new(1,1,1)
+title.Font=Enum.Font.GothamBold
 
-local tabBar = Instance.new("Frame", main)
-tabBar.Size = UDim2.new(1,0,0,30)
-tabBar.Position = UDim2.new(0,0,0,30)
-tabBar.BackgroundTransparency = 1
+local tabBar=Instance.new("Frame",main)
+tabBar.Size=UDim2.new(1,0,0,30)
+tabBar.Position=UDim2.new(0,0,0,30)
+tabBar.BackgroundTransparency=1
 
-local pages = Instance.new("Frame", main)
-pages.Size = UDim2.new(1,0,1,-60)
-pages.Position = UDim2.new(0,0,0,60)
-pages.BackgroundTransparency = 1
+local pages=Instance.new("Frame",main)
+pages.Size=UDim2.new(1,0,1,-60)
+pages.Position=UDim2.new(0,0,0,60)
+pages.BackgroundTransparency=1
 
 local function newPage()
-	local f = Instance.new("Frame", pages)
-	f.Size = UDim2.new(1,0,1,0)
-	f.BackgroundTransparency = 1
-	f.Visible = false
+	local f=Instance.new("Frame",pages)
+	f.Size=UDim2.new(1,0,1,0)
+	f.BackgroundTransparency=1
+	f.Visible=false
 	return f
 end
 
-local movementPage = newPage()
-local playerPage = newPage()
-local miscPage = newPage()
-
-movementPage.Visible = true
+local movementPage=newPage()
+local playerPage=newPage()
+local worldPage=newPage()
+local miscPage=newPage()
+movementPage.Visible=true
 
 local function switchPage(p)
-	for _,v in pairs(pages:GetChildren()) do
-		v.Visible = false
-	end
-	p.Visible = true
-	p.BackgroundTransparency = 1
-	TweenService:Create(p, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
+	for _,v in pairs(pages:GetChildren()) do v.Visible=false end
+	p.Visible=true
+	p.BackgroundTransparency=1
+	TweenService:Create(p,TweenInfo.new(0.2),{BackgroundTransparency=0}):Play()
 end
 
-local function makeTab(x, key, page)
-	local b = Instance.new("TextButton", tabBar)
-	b.Size = UDim2.new(0.33,0,1,0)
-	b.Position = UDim2.new(x,0,0,0)
-	b.BackgroundColor3 = Color3.fromRGB(25,25,25)
-	b.TextColor3 = Color3.new(1,1,1)
-	b.Font = Enum.Font.Gotham
-	b.TextSize = 13
-	Instance.new("UICorner", b)
-
-	b.MouseButton1Click:Connect(function()
-		switchPage(page)
-	end)
-
-	return b, key
+local function tab(x,name,page)
+	local b=Instance.new("TextButton",tabBar)
+	b.Size=UDim2.new(0.25,0,1,0)
+	b.Position=UDim2.new(x,0,0,0)
+	b.BackgroundColor3=Color3.fromRGB(25,25,25)
+	b.TextColor3=Color3.new(1,1,1)
+	Instance.new("UICorner",b)
+	b.MouseButton1Click:Connect(function() switchPage(page) end)
+	return b,name
 end
 
-local tabButtons = {}
+local tabs={}
+table.insert(tabs,{tab(0,"movement",movementPage)})
+table.insert(tabs,{tab(0.25,"player",playerPage)})
+table.insert(tabs,{tab(0.5,"world",worldPage)})
+table.insert(tabs,{tab(0.75,"misc",miscPage)})
 
-local t1,k1 = makeTab(0,"movement",movementPage)
-local t2,k2 = makeTab(0.33,"player",playerPage)
-local t3,k3 = makeTab(0.66,"misc",miscPage)
+local toggles={}
 
-table.insert(tabButtons,{btn=t1,key=k1})
-table.insert(tabButtons,{btn=t2,key=k2})
-table.insert(tabButtons,{btn=t3,key=k3})
+local function toggle(parent,y,label,callback)
+	local b=Instance.new("TextButton",parent)
+	b.Size=UDim2.new(1,-20,0,35)
+	b.Position=UDim2.new(0,10,0,y)
+	b.BackgroundColor3=Color3.fromRGB(28,28,28)
+	b.TextColor3=Color3.new(1,1,1)
+	Instance.new("UICorner",b)
 
-local toggles = {}
-
-local function createToggle(parent,y,key,callback)
-	local b = Instance.new("TextButton", parent)
-	b.Size = UDim2.new(1,-20,0,35)
-	b.Position = UDim2.new(0,10,0,y)
-	b.BackgroundColor3 = Color3.fromRGB(28,28,28)
-	b.TextColor3 = Color3.new(1,1,1)
-	b.Font = Enum.Font.GothamBold
-	b.TextSize = 14
-	Instance.new("UICorner", b)
-
-	local state = false
-
-	local data = {
-		button = b,
-		key = key,
-		set = function()
-			local t = L[lang]
-			b.Text = t[key] .. ": " .. (state and t.on or t.off)
+	local state=false
+	local t={
+		btn=b,label=label,
+		set=function()
+			local txt=L[lang]
+			b.Text=label..": "..(state and txt.on or txt.off)
 		end
 	}
 
 	b.MouseButton1Click:Connect(function()
-		state = not state
+		state=not state
 		callback(state)
-
-		TweenService:Create(b, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(40,40,40)}):Play()
+		TweenService:Create(b,TweenInfo.new(0.1),{BackgroundColor3=Color3.fromRGB(40,40,40)}):Play()
 		task.delay(0.1,function()
-			TweenService:Create(b, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(28,28,28)}):Play()
+			TweenService:Create(b,TweenInfo.new(0.1),{BackgroundColor3=Color3.fromRGB(28,28,28)}):Play()
 		end)
-
-		data.set()
+		t.set()
 	end)
 
-	table.insert(toggles,data)
-	data.set()
-	return data
+	table.insert(toggles,t)
+	t.set()
+	return t,function() return state end
 end
 
-local speedEnabled = false
-createToggle(movementPage,10,"speed",function(v)
-	speedEnabled = v
-end)
+local function slider(parent,y,min,max,val,callback)
+	local bar=Instance.new("Frame",parent)
+	bar.Size=UDim2.new(1,-20,0,6)
+	bar.Position=UDim2.new(0,10,0,y)
+	bar.BackgroundColor3=Color3.fromRGB(50,50,50)
 
-local fly = false
-createToggle(movementPage,60,"fly",function(v)
-	fly = v
-end)
+	local fill=Instance.new("Frame",bar)
+	fill.Size=UDim2.new(0.5,0,1,0)
+	fill.BackgroundColor3=Color3.fromRGB(0,170,255)
+	Instance.new("UICorner",bar)
+	Instance.new("UICorner",fill)
 
-local noclip = false
-createToggle(movementPage,110,"noclip",function(v)
-	noclip = v
-end)
-
-local langBtn = Instance.new("TextButton", miscPage)
-langBtn.Size = UDim2.new(1,-20,0,35)
-langBtn.Position = UDim2.new(0,10,0,10)
-langBtn.BackgroundColor3 = Color3.fromRGB(28,28,28)
-langBtn.TextColor3 = Color3.new(1,1,1)
-Instance.new("UICorner", langBtn)
-
-local langs = {"en","es","he","fr","de"}
-local idx = table.find(langs, lang) or 1
-
-langBtn.MouseButton1Click:Connect(function()
-	idx = idx % #langs + 1
-	lang = langs[idx]
-	updateText()
-end)
-
-function updateText()
-	local t = L[lang]
-	title.Text = t.hub
-	langBtn.Text = t.lang .. ": " .. lang:upper()
-
-	for _,tab in pairs(tabButtons) do
-		tab.btn.Text = t[tab.key]
+	local function set(x)
+		local p=math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
+		fill.Size=UDim2.new(p,0,1,0)
+		callback(min+(max-min)*p)
 	end
 
-	for _,tg in pairs(toggles) do
-		tg.set()
-	end
+	bar.InputBegan:Connect(function(i)
+		if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+			set(i.Position.X)
+		end
+	end)
 end
+
+local originalSpeed=16
+local speedVal=16
+local speedEnabled=false
+
+toggle(movementPage,10,"Speed",function(v)
+	speedEnabled=v
+	if not v then
+		local h=getHum()
+		if h then h.WalkSpeed=originalSpeed end
+	end
+end)
+
+slider(movementPage,50,16,200,16,function(v)
+	speedVal=v
+end)
+
+local fly=false
+local flySpeed=60
+
+toggle(movementPage,90,"Fly",function(v) fly=v end)
+slider(movementPage,130,10,200,60,function(v) flySpeed=v end)
+
+local noclip=false
+toggle(movementPage,170,"Noclip",function(v) noclip=v end)
+
+local infJump=false
+toggle(playerPage,10,"InfJump",function(v) infJump=v end)
+
+local gravity=workspace.Gravity
+slider(worldPage,10,0,196,gravity,function(v) workspace.Gravity=v end)
+
+local fov=70
+slider(worldPage,50,60,120,fov,function(v) workspace.CurrentCamera.FieldOfView=v end)
+
+local wf=false
+local wfPower=12000
+toggle(miscPage,10,"WalkFling",function(v) wf=v end)
+slider(miscPage,50,2000,50000,wfPower,function(v) wfPower=v end)
+
+UIS.InputBegan:Connect(function(i,g)
+	if g then return end
+	if infJump and i.KeyCode==Enum.KeyCode.Space then
+		local h=getHum()
+		if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+	end
+end)
 
 RunService.Heartbeat:Connect(function()
-	local hum = getHum()
-	local root = getRoot()
-	if not hum or not root then return end
+	local h=getHum()
+	local root=getRoot()
+	if not h or not root then return end
+
+	if not originalSpeed or originalSpeed==0 then
+		originalSpeed=h.WalkSpeed
+	end
 
 	if speedEnabled then
-		hum.WalkSpeed = 60
+		h.WalkSpeed=speedVal
 	end
 
 	if fly then
-		root.Velocity = workspace.CurrentCamera.CFrame.LookVector * 60
+		root.Velocity=workspace.CurrentCamera.CFrame.LookVector*flySpeed
 	end
 
 	if noclip then
 		for _,v in pairs(player.Character:GetDescendants()) do
-			if v:IsA("BasePart") then
-				v.CanCollide = false
-			end
+			if v:IsA("BasePart") then v.CanCollide=false end
 		end
 	end
+
+	if wf then
+		local vel=root.Velocity
+		root.Velocity=vel*(wfPower/1000)+Vector3.new(0,wfPower/2000,0)
+	end
 end)
+
+local function updateText()
+	title.Text=L[lang].hub
+	for _,t in pairs(toggles) do t.set() end
+end
 
 updateText()
