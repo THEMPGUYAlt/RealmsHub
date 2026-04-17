@@ -11,16 +11,10 @@
               Mobile Support | Multiple Languages Support
 ]]
 
--- ===============================
---          LOAD LIBRARIES
--- ===============================
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
--- ===============================
---          LANGUAGE SYSTEM
--- ===============================
 local Languages = {
     EN = {
         WindowTitle = "Realms Hub",
@@ -51,14 +45,17 @@ local Languages = {
         Waypoints = "Waypoints",
         AntiAFK = "Anti-AFK",
         AutoClicker = "Auto Clicker",
+        ClickButton = "Click Button",
+        Left = "Left",
+        Right = "Right",
+        Middle = "Middle",
+        ClickInterval = "Click Interval (s)",
         ChatSpammer = "Chat Spammer",
         SpamDelay = "Spam Delay (s)",
         Fling = "Fling Player",
         Freeze = "Freeze Player",
-        NoFall = "No Fall Damage",
         LagSwitch = "Lag Switch",
         BToolsRange = "BTools Range",
-        AutoRespawn = "Auto Respawn",
         Rejoin = "Rejoin",
         ServerHop = "Server Hop",
         Language = "Language (EN/HE)",
@@ -96,14 +93,17 @@ local Languages = {
         Waypoints = "נקודות ציון",
         AntiAFK = "Anti-AFK",
         AutoClicker = "לחיצה אוטומטית",
+        ClickButton = "כפתור לחיצה",
+        Left = "שמאלי",
+        Right = "ימני",
+        Middle = "אמצעי",
+        ClickInterval = "מרווח לחיצה (שנ)",
         ChatSpammer = "ספאמר צ'אט",
         SpamDelay = "עיכוב ספאם (שנ)",
         Fling = "העף שחקן",
         Freeze = "הקפא שחקן",
-        NoFall = "ללא נזק נפילה",
         LagSwitch = "לאג סוויץ'",
         BToolsRange = "טווח כלי בנייה",
-        AutoRespawn = "ספון אוטומטי",
         Rejoin = "הצטרף מחדש",
         ServerHop = "קפיצת שרת",
         Language = "שפה (EN/HE)",
@@ -117,9 +117,6 @@ local Languages = {
 local currentLang = "EN"
 local function t(key) return Languages[currentLang][key] or key end
 
--- ===============================
---          SERVICES
--- ===============================
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RS = game:GetService("RunService")
@@ -128,14 +125,12 @@ local Workspace = game:GetService("Workspace")
 local VirtualUser = game:GetService("VirtualUser")
 local TeleportService = game:GetService("TeleportService")
 local Debris = game:GetService("Debris")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local lp = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local mouse = lp:GetMouse()
 
--- ===============================
---          EXPLOIT VARIABLES
--- ===============================
 local flyEnabled = false
 local noclipEnabled = false
 local infiniteJumpEnabled = false
@@ -154,17 +149,17 @@ local spinBotEnabled = false
 local antiAFKEnabled = false
 local autoClickerEnabled = false
 local chatSpammerEnabled = false
-local noFallEnabled = false
 local lagSwitchEnabled = false
-local autoRespawnEnabled = false
 local btoolsRangeEnabled = false
 
 local flySpeed = 50
 local clickInterval = 0.1
 local spamDelay = 2
-local gravityValue = 196.2
+local gravityValue = Workspace.Gravity
+local originalGravity = Workspace.Gravity
 local btoolsRange = 50
 local aimbotFOV = 100
+local clickButton = "Left"
 
 local flyBodyVelocity = nil
 local flyBodyGyro = nil
@@ -176,23 +171,23 @@ local killAuraConnection = nil
 local spinBotConnection = nil
 local autoJumpConnection = nil
 local lagSwitchConnection = nil
+local lagSwitchPacket = nil
 local espHighlights = {}
 local frozenPlayers = {}
 local waypoints = {}
 local textChannel = nil
+local originalWalkspeed = 16
+local originalJumpPower = 50
+local originalBrightness = Lighting.Brightness
+local originalFogEnd = Lighting.FogEnd
+local originalHealth = nil
+local healthConnection = nil
+local godModeRespawnConnection = nil
 
--- ===============================
---          UTILITY FUNCTIONS
--- ===============================
 local function getCharacter() return lp.Character end
 local function getHumanoid() local c = getCharacter(); return c and c:FindFirstChild("Humanoid") end
 local function getHRP() local c = getCharacter(); return c and (c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("Torso") or c:FindFirstChild("UpperTorso")) end
 
--- ===============================
---          EXPLOIT IMPLEMENTATIONS
--- ===============================
-
--- Noclip
 local function setNoclip(state)
     local char = getCharacter()
     if not char then return end
@@ -203,15 +198,15 @@ local function setNoclip(state)
     end
 end
 
--- Infinite Jump
-UIS.JumpPressed:Connect(function()
+local infiniteJumpConnection = nil
+if infiniteJumpConnection then infiniteJumpConnection:Disconnect() end
+infiniteJumpConnection = UIS.JumpPressed:Connect(function()
     if infiniteJumpEnabled then
         local hum = getHumanoid()
         if hum then hum.Jump = true end
     end
 end)
 
--- Auto Jump
 local function autoJumpLoop()
     if not autoJumpEnabled then return end
     local hum = getHumanoid()
@@ -220,7 +215,6 @@ local function autoJumpLoop()
     end
 end
 
--- Speed Hack
 local function speedHackLoop()
     if speedHackEnabled then
         local hum = getHumanoid()
@@ -228,7 +222,6 @@ local function speedHackLoop()
     end
 end
 
--- Kill Aura
 local function killAuraLoop()
     if not killAuraEnabled then return end
     local hrp = getHRP()
@@ -244,11 +237,9 @@ local function killAuraLoop()
     end
 end
 
--- God Mode
-local originalHealth = nil
-local healthConnection = nil
 local function setGodMode(state)
     if healthConnection then healthConnection:Disconnect() end
+    if godModeRespawnConnection then godModeRespawnConnection:Disconnect() end
     if state then
         local hum = getHumanoid()
         if hum then
@@ -256,11 +247,22 @@ local function setGodMode(state)
             healthConnection = hum:GetPropertyChangedSignal("Health"):Connect(function()
                 if hum.Health < originalHealth then hum.Health = originalHealth end
             end)
+            godModeRespawnConnection = hum.Died:Connect(function()
+                task.wait(0.5)
+                local newHum = getHumanoid()
+                if newHum then
+                    newHum.Health = newHum.MaxHealth
+                    originalHealth = newHum.MaxHealth
+                    if healthConnection then healthConnection:Disconnect() end
+                    healthConnection = newHum:GetPropertyChangedSignal("Health"):Connect(function()
+                        if newHum.Health < originalHealth then newHum.Health = originalHealth end
+                    end)
+                end
+            end)
         end
     end
 end
 
--- One Hit Kill
 local function onTouched(hit)
     if not oneHitKillEnabled then return end
     local humanoid = hit.Parent:FindFirstChild("Humanoid")
@@ -269,7 +271,6 @@ local function onTouched(hit)
     end
 end
 
--- Infinite Stamina
 local function infiniteStaminaLoop()
     if not infiniteStaminaEnabled then return end
     local hum = getHumanoid()
@@ -279,7 +280,6 @@ local function infiniteStaminaLoop()
     end
 end
 
--- Aimbot
 local function getClosestPlayer()
     local closest = nil
     local closestDist = aimbotFOV
@@ -311,7 +311,6 @@ local function aimbotLoop()
     end
 end
 
--- Silent Aim
 local function silentAimHit()
     if not silentAimEnabled then return end
     local target = getClosestPlayer()
@@ -331,7 +330,6 @@ UIS.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then silentAimHit() end
 end)
 
--- ESP
 local function updateESP()
     if not espEnabled then
         for _, hl in pairs(espHighlights) do if hl then hl:Destroy() end end
@@ -369,75 +367,90 @@ Players.PlayerAdded:Connect(function(plr)
     end
 end)
 
--- FullBright
 local function setFullBright(state)
     if state then
+        originalBrightness = Lighting.Brightness
         Lighting.Brightness = 2
         Lighting.ClockTime = 12
     else
-        Lighting.Brightness = 0
+        Lighting.Brightness = originalBrightness
         Lighting.ClockTime = 0
     end
 end
 
--- No Fog
 local function setNoFog(state)
     if state then
+        originalFogEnd = Lighting.FogEnd
         Lighting.FogEnd = 100000
     else
-        Lighting.FogEnd = 10000
+        Lighting.FogEnd = originalFogEnd
     end
 end
 
--- Spin Bot
 local function spinBotLoop()
     if not spinBotEnabled then return end
     local hrp = getHRP()
     if hrp then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(10), 0) end
 end
 
--- Anti-AFK
 local function startAntiAFK()
     if antiAFKConnection then antiAFKConnection:Disconnect() end
     antiAFKConnection = RS.RenderStepped:Connect(function()
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
+        local hum = getHumanoid()
+        if hum then
+            hum:Move(Vector3.new(0.1, 0, 0.1), true)
+        end
     end)
 end
 local function stopAntiAFK()
     if antiAFKConnection then antiAFKConnection:Disconnect() end
 end
 
--- Chat Spammer
 local function startChatSpammer()
     if spamConnection then spamConnection:Disconnect() end
-    
-    -- Find the main text channel, fall back to RBXGeneral
     local textChatService = game:GetService("TextChatService")
-    local textChannels = textChatService:WaitForChild("TextChannels")
-    textChannel = textChannels:FindFirstChild("RBXGeneral") or textChannels:GetChildren()[1]
-    
+    local textChannels = textChatService:FindFirstChild("TextChannels")
+    if textChannels then
+        textChannel = textChannels:FindFirstChild("RBXGeneral") or textChannels:GetChildren()[1]
+    end
     if not textChannel then
-        Fluent:Notify({ Title = "Chat Error", Content = "Could not find text channel.", Duration = 3 })
+        Fluent:Notify({ Title = "Chat Error", Content = "No text channel found", Duration = 3 })
         return
     end
-    
+    local spamMessage = "Realms Hub OP!"
     spamConnection = RS.RenderStepped:Connect(function()
-        local success, err = pcall(function()
+        pcall(function()
             textChannel:SendAsync(spamMessage)
         end)
-        if not success then
-            warn("Chat Spammer Error:", err)
-        end
         task.wait(spamDelay)
     end)
 end
-
 local function stopChatSpammer()
     if spamConnection then spamConnection:Disconnect() end
 end
 
--- Fling Player
+local function startAutoClicker()
+    if clickConnection then clickConnection:Disconnect() end
+    local button = Enum.UserInputType.MouseButton1
+    if clickButton == "Right" then button = Enum.UserInputType.MouseButton2
+    elseif clickButton == "Middle" then button = Enum.UserInputType.MouseButton3 end
+    clickConnection = RS.RenderStepped:Connect(function()
+        pcall(function()
+            local input = Instance.new("InputObject")
+            input.UserInputType = button
+            input.KeyCode = Enum.KeyCode.Unknown
+            input.Position = UIS:GetMouseLocation()
+            UIS:InputBegan(input, false)
+            task.wait(0.05)
+            UIS:InputEnded(input, false)
+        end)
+        task.wait(clickInterval)
+    end)
+end
+local function stopAutoClicker()
+    if clickConnection then clickConnection:Disconnect() end
+end
+
 local function flingPlayer(target)
     local targetHRP = target.Character and (target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("Torso"))
     if not targetHRP then return end
@@ -449,7 +462,6 @@ local function flingPlayer(target)
     targetHRP.AssemblyLinearVelocity = (targetHRP.Position - camera.CFrame.Position).Unit * 500 + Vector3.new(0, 200, 0)
 end
 
--- Freeze Player
 local function freezePlayer(target)
     local targetHRP = target.Character and (target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("Torso"))
     if not targetHRP then return end
@@ -465,40 +477,25 @@ local function freezePlayer(target)
     end
 end
 
--- No Fall Damage
-local function noFallLoop()
-    if not noFallEnabled then return end
-    local hrp = getHRP()
-    if hrp and hrp.AssemblyLinearVelocity.Y < -30 then
-        hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 0, hrp.AssemblyLinearVelocity.Z)
-    end
-end
-
--- Lag Switch
-local function lagSwitchLoop()
-    if lagSwitchEnabled then
-        for _, v in pairs(Workspace:GetDescendants()) do
-            if v:IsA("BasePart") and v ~= lp.Character then v.Anchored = true end
-        end
-    else
-        for _, v in pairs(Workspace:GetDescendants()) do
-            if v:IsA("BasePart") and v.Anchored and v ~= lp.Character then v.Anchored = false end
-        end
-    end
-end
-
--- Auto Respawn
-local function setupAutoRespawn()
-    if autoRespawnEnabled then
-        lp.CharacterAdded:Connect(function()
-            task.wait(0.5)
-            if godModeEnabled then setGodMode(true) end
-            if flyEnabled then startFly() end
+local function startLagSwitch()
+    if lagSwitchConnection then lagSwitchConnection:Disconnect() end
+    local remote = Instance.new("RemoteEvent")
+    remote.Name = "LagSwitchPing"
+    remote.Parent = ReplicatedStorage
+    local largeData = string.rep("A", 1000000)
+    lagSwitchConnection = RS.RenderStepped:Connect(function()
+        pcall(function()
+            remote:FireServer(largeData)
         end)
-    end
+        task.wait(0.1)
+    end)
+end
+local function stopLagSwitch()
+    if lagSwitchConnection then lagSwitchConnection:Disconnect() end
+    local remote = ReplicatedStorage:FindFirstChild("LagSwitchPing")
+    if remote then remote:Destroy() end
 end
 
--- BTools Range
 local function setBToolsRange()
     if not btoolsRangeEnabled then return end
     local tool = lp.Backpack:FindFirstChildWhichIsA("Tool") or (lp.Character and lp.Character:FindFirstChildWhichIsA("Tool"))
@@ -508,12 +505,10 @@ local function setBToolsRange()
     end
 end
 
--- Gravity
 local function setGravity(val)
     Workspace.Gravity = val
 end
 
--- Fly System
 local function startFly()
     local hrp = getHRP()
     local hum = getHumanoid()
@@ -568,9 +563,6 @@ UIS.InputEnded:Connect(function(input)
     elseif key == Enum.KeyCode.Space then flyKeys.Space = false end
 end)
 
--- ===============================
---          CREATE FLUENT UI
--- ===============================
 local Window = Fluent:CreateWindow({
     Title = t("WindowTitle"),
     SubTitle = "by Realms",
@@ -590,9 +582,6 @@ local Tabs = {
     Settings = Window:AddTab({ Title = t("Tabs")[6], Icon = "settings" })
 }
 
--- ===============================
---          MOVEMENT TAB
--- ===============================
 local MovementSection = Tabs.Movement:AddSection(t("Walkspeed"))
 
 local WalkspeedSlider = MovementSection:AddSlider("Walkspeed", {
@@ -630,7 +619,21 @@ local FOVSlider = MovementSection:AddSlider("FOV", {
     end
 })
 
-local GravitySlider = MovementSection:AddSlider("Gravity", {
+local gravityToggleState = false
+local GravityToggle = MovementSection:AddToggle("GravityToggle", {
+    Title = t("Gravity"),
+    Default = false,
+    Callback = function(state)
+        if state then
+            originalGravity = Workspace.Gravity
+            setGravity(gravityValue)
+        else
+            setGravity(originalGravity)
+        end
+    end
+})
+
+local GravitySlider = MovementSection:AddSlider("GravitySlider", {
     Title = t("Gravity"),
     Default = 196.2,
     Min = 0,
@@ -638,7 +641,7 @@ local GravitySlider = MovementSection:AddSlider("Gravity", {
     Rounding = 1,
     Callback = function(v)
         gravityValue = v
-        setGravity(v)
+        if GravityToggle.Value then setGravity(v) end
     end
 })
 
@@ -700,9 +703,6 @@ local SpeedHackToggle = MovementSection:AddToggle("SpeedHackToggle", {
     end
 })
 
--- ===============================
---          COMBAT TAB
--- ===============================
 local CombatSection = Tabs.Combat:AddSection(t("KillAura"))
 
 local KillAuraToggle = CombatSection:AddToggle("KillAuraToggle", {
@@ -768,9 +768,6 @@ local SilentAimToggle = CombatSection:AddToggle("SilentAimToggle", {
     Callback = function(state) silentAimEnabled = state end
 })
 
--- ===============================
---          VISUAL TAB
--- ===============================
 local VisualSection = Tabs.Visual:AddSection(t("ESP"))
 
 local ESPToggle = VisualSection:AddToggle("ESPToggle", {
@@ -808,9 +805,6 @@ local SpinBotToggle = VisualSection:AddToggle("SpinBotToggle", {
     end
 })
 
--- ===============================
---          TELEPORTS TAB
--- ===============================
 local TeleportsSection = Tabs.Teleports:AddSection(t("TPToMouse"))
 
 TeleportsSection:AddButton({
@@ -821,7 +815,6 @@ TeleportsSection:AddButton({
     end
 })
 
--- Player dropdown for TP
 local playerNames = {}
 local function updatePlayerList()
     playerNames = {}
@@ -855,12 +848,6 @@ TeleportsSection:AddButton({
     end
 })
 
--- Waypoints
-local function refreshWaypoints()
-    -- Remove existing waypoint UI elements (this is simplified; for full implementation you'd need to store references)
-    -- For brevity, we'll just add a button to add waypoints and show them in a paragraph.
-end
-
 TeleportsSection:AddButton({
     Title = t("AddWaypoint"),
     Callback = function()
@@ -872,7 +859,6 @@ TeleportsSection:AddButton({
     end
 })
 
--- Show waypoints list (simple paragraph updated on add)
 local WaypointParagraph = TeleportsSection:AddParagraph({
     Title = t("Waypoints"),
     Content = "No waypoints yet."
@@ -890,7 +876,6 @@ local function updateWaypointDisplay()
     end
 end
 
--- Override AddWaypoint to update display
 local addBtn = TeleportsSection:AddButton({ Title = t("AddWaypoint"), Callback = function() end })
 addBtn.Callback = function()
     local hrp = getHRP()
@@ -902,9 +887,6 @@ addBtn.Callback = function()
 end
 updateWaypointDisplay()
 
--- ===============================
---          EXPLOITS TAB
--- ===============================
 local ExploitsSection = Tabs.Exploits:AddSection(t("AntiAFK"))
 
 local AntiAFKToggle = ExploitsSection:AddToggle("AntiAFKToggle", {
@@ -921,14 +903,37 @@ local AutoClickerToggle = ExploitsSection:AddToggle("AutoClickerToggle", {
     Default = false,
     Callback = function(state)
         autoClickerEnabled = state
-        if state then
-            if clickConnection then clickConnection:Disconnect() end
-            clickConnection = RS.RenderStepped:Connect(function()
-                mouse1click()
-                task.wait(clickInterval)
-            end)
-        else
-            if clickConnection then clickConnection:Disconnect() end
+        if state then startAutoClicker() else stopAutoClicker() end
+    end
+})
+
+local ClickButtonDropdown = ExploitsSection:AddDropdown("ClickButtonDropdown", {
+    Title = t("ClickButton"),
+    Values = {t("Left"), t("Right"), t("Middle")},
+    Default = 1,
+    Multi = false,
+    Callback = function(val)
+        if val == t("Left") then clickButton = "Left"
+        elseif val == t("Right") then clickButton = "Right"
+        else clickButton = "Middle" end
+        if autoClickerEnabled then
+            stopAutoClicker()
+            startAutoClicker()
+        end
+    end
+})
+
+local ClickIntervalSlider = ExploitsSection:AddSlider("ClickInterval", {
+    Title = t("ClickInterval"),
+    Default = 0.1,
+    Min = 0.01,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(v)
+        clickInterval = v
+        if autoClickerEnabled then
+            stopAutoClicker()
+            startAutoClicker()
         end
     end
 })
@@ -957,38 +962,12 @@ local SpamDelaySlider = ExploitsSection:AddSlider("SpamDelay", {
     end
 })
 
-local NoFallToggle = ExploitsSection:AddToggle("NoFallToggle", {
-    Title = t("NoFall"),
-    Default = false,
-    Callback = function(state)
-        noFallEnabled = state
-        if state then
-            RS.RenderStepped:Connect(noFallLoop)
-        end
-    end
-})
-
 local LagSwitchToggle = ExploitsSection:AddToggle("LagSwitchToggle", {
     Title = t("LagSwitch"),
     Default = false,
     Callback = function(state)
         lagSwitchEnabled = state
-        if state then
-            if lagSwitchConnection then lagSwitchConnection:Disconnect() end
-            lagSwitchConnection = RS.RenderStepped:Connect(lagSwitchLoop)
-        else
-            if lagSwitchConnection then lagSwitchConnection:Disconnect() end
-            lagSwitchLoop()
-        end
-    end
-})
-
-local AutoRespawnToggle = ExploitsSection:AddToggle("AutoRespawnToggle", {
-    Title = t("AutoRespawn"),
-    Default = false,
-    Callback = function(state)
-        autoRespawnEnabled = state
-        setupAutoRespawn()
+        if state then startLagSwitch() else stopLagSwitch() end
     end
 })
 
@@ -1013,7 +992,6 @@ local BToolsRangeSlider = ExploitsSection:AddSlider("BToolsRange", {
     end
 })
 
--- Fling & Freeze dropdowns
 local FlingDropdown = ExploitsSection:AddDropdown("FlingDropdown", {
     Title = t("Fling"),
     Values = playerNames,
@@ -1052,7 +1030,6 @@ ExploitsSection:AddButton({
     end
 })
 
--- Rejoin / Server Hop
 ExploitsSection:AddButton({
     Title = t("Rejoin"),
     Callback = function()
@@ -1066,9 +1043,6 @@ ExploitsSection:AddButton({
     end
 })
 
--- ===============================
---          SETTINGS TAB
--- ===============================
 local SettingsSection = Tabs.Settings:AddSection(t("Language"))
 
 SettingsSection:AddButton({
@@ -1079,7 +1053,6 @@ SettingsSection:AddButton({
         else
             currentLang = "EN"
         end
-        -- Update window title and tab titles dynamically
         Window:SetTitle(t("WindowTitle"))
         for i, tab in ipairs(Tabs) do
             tab:SetTitle(t("Tabs")[i])
@@ -1088,9 +1061,6 @@ SettingsSection:AddButton({
     end
 })
 
--- ===============================
---          ADDONS (SaveManager & InterfaceManager)
--- ===============================
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
@@ -1111,10 +1081,6 @@ Fluent:Notify({
 
 SaveManager:LoadAutoloadConfig()
 
--- ===============================
---          HEARTBEAT LOOP
--- ===============================
 RS.Heartbeat:Connect(updateFly)
 
--- Initial gravity
-setGravity(gravityValue)
+setGravity(originalGravity)
