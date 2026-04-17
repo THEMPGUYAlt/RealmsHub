@@ -39,8 +39,6 @@ local Languages = {
         GodMode = "God Mode",
         OneHitKill = "One Hit Kill",
         InfiniteStamina = "Infinite Stamina",
-        RapidFire = "Rapid Fire",
-        ClickInterval = "Click Interval",
         Aimbot = "Aimbot",
         SilentAim = "Silent Aim",
         ESP = "ESP",
@@ -86,8 +84,6 @@ local Languages = {
         GodMode = "מצב אלוהים",
         OneHitKill = "מכה אחת הורגת",
         InfiniteStamina = "סיבולת אינסופית",
-        RapidFire = "ירי מהיר",
-        ClickInterval = "מרווח לחיצה",
         Aimbot = "אייבוט",
         SilentAim = "סיילנט איים",
         ESP = "ESP",
@@ -149,7 +145,6 @@ local killAuraEnabled = false
 local godModeEnabled = false
 local oneHitKillEnabled = false
 local infiniteStaminaEnabled = false
-local rapidFireEnabled = false
 local aimbotEnabled = false
 local silentAimEnabled = false
 local espEnabled = false
@@ -184,6 +179,7 @@ local lagSwitchConnection = nil
 local espHighlights = {}
 local frozenPlayers = {}
 local waypoints = {}
+local textChannel = nil
 
 -- ===============================
 --          UTILITY FUNCTIONS
@@ -281,18 +277,6 @@ local function infiniteStaminaLoop()
         local stamina = hum:FindFirstChild("Stamina") or hum:FindFirstChild("Energy")
         if stamina then stamina.Value = 100 end
     end
-end
-
--- Rapid Fire / Auto Clicker
-local function startRapidFire()
-    if clickConnection then clickConnection:Disconnect() end
-    clickConnection = RS.RenderStepped:Connect(function()
-        mouse1click()
-        task.wait(clickInterval)
-    end)
-end
-local function stopRapidFire()
-    if clickConnection then clickConnection:Disconnect() end
 end
 
 -- Aimbot
@@ -424,28 +408,29 @@ local function stopAntiAFK()
     if antiAFKConnection then antiAFKConnection:Disconnect() end
 end
 
--- Chat Spammer (Updated to use TextChatService with fallback)
+-- Chat Spammer
 local function startChatSpammer()
     if spamConnection then spamConnection:Disconnect() end
     
-    -- Try to use the modern TextChatService first
+    -- Find the main text channel, fall back to RBXGeneral
     local textChatService = game:GetService("TextChatService")
-    local chatInputBar = textChatService:FindFirstChild("ChatInputBarConfiguration")
-    local targetChannel = chatInputBar and chatInputBar:FindFirstChild("TargetTextChannel")
+    local textChannels = textChatService:WaitForChild("TextChannels")
+    textChannel = textChannels:FindFirstChild("RBXGeneral") or textChannels:GetChildren()[1]
     
-    if targetChannel then
-        -- Using TextChatService (new system)
-        spamConnection = RS.RenderStepped:Connect(function()
-            targetChannel:SendAsync(spamMessage)
-            task.wait(spamDelay)
-        end)
-    else
-        -- Fallback to legacy chat system
-        spamConnection = RS.RenderStepped:Connect(function()
-            lp.Chat:Chat(spamMessage)
-            task.wait(spamDelay)
-        end)
+    if not textChannel then
+        Fluent:Notify({ Title = "Chat Error", Content = "Could not find text channel.", Duration = 3 })
+        return
     end
+    
+    spamConnection = RS.RenderStepped:Connect(function()
+        local success, err = pcall(function()
+            textChannel:SendAsync(spamMessage)
+        end)
+        if not success then
+            warn("Chat Spammer Error:", err)
+        end
+        task.wait(spamDelay)
+    end)
 end
 
 local function stopChatSpammer()
@@ -766,30 +751,6 @@ local InfiniteStaminaToggle = CombatSection:AddToggle("InfiniteStaminaToggle", {
     end
 })
 
-local RapidFireToggle = CombatSection:AddToggle("RapidFireToggle", {
-    Title = t("RapidFire"),
-    Default = false,
-    Callback = function(state)
-        rapidFireEnabled = state
-        if state then startRapidFire() else stopRapidFire() end
-    end
-})
-
-local ClickIntervalSlider = CombatSection:AddSlider("ClickInterval", {
-    Title = t("ClickInterval"),
-    Default = 0.1,
-    Min = 0.01,
-    Max = 1,
-    Rounding = 2,
-    Callback = function(v)
-        clickInterval = v
-        if rapidFireEnabled then
-            stopRapidFire()
-            startRapidFire()
-        end
-    end
-})
-
 local AimbotToggle = CombatSection:AddToggle("AimbotToggle", {
     Title = t("Aimbot"),
     Default = false,
@@ -960,7 +921,15 @@ local AutoClickerToggle = ExploitsSection:AddToggle("AutoClickerToggle", {
     Default = false,
     Callback = function(state)
         autoClickerEnabled = state
-        if state then startRapidFire() else stopRapidFire() end
+        if state then
+            if clickConnection then clickConnection:Disconnect() end
+            clickConnection = RS.RenderStepped:Connect(function()
+                mouse1click()
+                task.wait(clickInterval)
+            end)
+        else
+            if clickConnection then clickConnection:Disconnect() end
+        end
     end
 })
 
