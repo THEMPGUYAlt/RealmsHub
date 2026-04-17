@@ -59,8 +59,6 @@ local Languages = {
         Freeze = "Freeze Player",
         NoFall = "No Fall Damage",
         LagSwitch = "Lag Switch",
-        InfiniteAmmo = "Infinite Ammo",
-        NoRecoil = "No Recoil",
         BToolsRange = "BTools Range",
         AutoRespawn = "Auto Respawn",
         Rejoin = "Rejoin",
@@ -108,8 +106,6 @@ local Languages = {
         Freeze = "הקפא שחקן",
         NoFall = "ללא נזק נפילה",
         LagSwitch = "לאג סוויץ'",
-        InfiniteAmmo = "תחמושת אינסופית",
-        NoRecoil = "ללא רתע",
         BToolsRange = "טווח כלי בנייה",
         AutoRespawn = "ספון אוטומטי",
         Rejoin = "הצטרף מחדש",
@@ -165,8 +161,6 @@ local autoClickerEnabled = false
 local chatSpammerEnabled = false
 local noFallEnabled = false
 local lagSwitchEnabled = false
-local infiniteAmmoEnabled = false
-local noRecoilEnabled = false
 local autoRespawnEnabled = false
 local btoolsRangeEnabled = false
 
@@ -430,14 +424,30 @@ local function stopAntiAFK()
     if antiAFKConnection then antiAFKConnection:Disconnect() end
 end
 
--- Chat Spammer
+-- Chat Spammer (Updated to use TextChatService with fallback)
 local function startChatSpammer()
     if spamConnection then spamConnection:Disconnect() end
-    spamConnection = RS.RenderStepped:Connect(function()
-        lp.Chat:Chat("Realms Hub OP!")
-        task.wait(spamDelay)
-    end)
+    
+    -- Try to use the modern TextChatService first
+    local textChatService = game:GetService("TextChatService")
+    local chatInputBar = textChatService:FindFirstChild("ChatInputBarConfiguration")
+    local targetChannel = chatInputBar and chatInputBar:FindFirstChild("TargetTextChannel")
+    
+    if targetChannel then
+        -- Using TextChatService (new system)
+        spamConnection = RS.RenderStepped:Connect(function()
+            targetChannel:SendAsync(spamMessage)
+            task.wait(spamDelay)
+        end)
+    else
+        -- Fallback to legacy chat system
+        spamConnection = RS.RenderStepped:Connect(function()
+            lp.Chat:Chat(spamMessage)
+            task.wait(spamDelay)
+        end)
+    end
 end
+
 local function stopChatSpammer()
     if spamConnection then spamConnection:Disconnect() end
 end
@@ -488,25 +498,6 @@ local function lagSwitchLoop()
     else
         for _, v in pairs(Workspace:GetDescendants()) do
             if v:IsA("BasePart") and v.Anchored and v ~= lp.Character then v.Anchored = false end
-        end
-    end
-end
-
--- Infinite Ammo & No Recoil
-local function applyWeaponMods()
-    if not infiniteAmmoEnabled and not noRecoilEnabled then return end
-    for _, tool in pairs(lp.Backpack:GetChildren()) do
-        if tool:IsA("Tool") then
-            if infiniteAmmoEnabled then
-                local ammo = tool:FindFirstChild("Ammo")
-                if ammo then ammo.Value = 9999 end
-                local mag = tool:FindFirstChild("Magazine")
-                if mag then mag.Value = 9999 end
-            end
-            if noRecoilEnabled then
-                local recoil = tool:FindFirstChild("Recoil")
-                if recoil then recoil:Destroy() end
-            end
         end
     end
 end
@@ -939,8 +930,6 @@ local function updateWaypointDisplay()
 end
 
 -- Override AddWaypoint to update display
-local oldAddWaypoint = TeleportsSection.AddButton
--- We'll just call update after each addition
 local addBtn = TeleportsSection:AddButton({ Title = t("AddWaypoint"), Callback = function() end })
 addBtn.Callback = function()
     local hrp = getHRP()
@@ -996,24 +985,6 @@ local SpamDelaySlider = ExploitsSection:AddSlider("SpamDelay", {
             stopChatSpammer()
             startChatSpammer()
         end
-    end
-})
-
-local InfiniteAmmoToggle = ExploitsSection:AddToggle("InfiniteAmmoToggle", {
-    Title = t("InfiniteAmmo"),
-    Default = false,
-    Callback = function(state)
-        infiniteAmmoEnabled = state
-        RS.RenderStepped:Connect(applyWeaponMods)
-    end
-})
-
-local NoRecoilToggle = ExploitsSection:AddToggle("NoRecoilToggle", {
-    Title = t("NoRecoil"),
-    Default = false,
-    Callback = function(state)
-        noRecoilEnabled = state
-        RS.RenderStepped:Connect(applyWeaponMods)
     end
 })
 
